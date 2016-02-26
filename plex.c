@@ -1,8 +1,12 @@
 #define _XOPEN_SOURCE 600
 #define _GNU_SOURCE
 #include <pty.h>
-#include <fcntl.h>
+
 #include <unistd.h>
+#include <fcntl.h>
+#include <signal.h>
+
+#include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
 
@@ -13,13 +17,25 @@ void father(int);
 int spillout(int, int);
 void child(int, char*, char*);
 
-void alt(char *cmd) {
+int main(int argc, char *argv[]) {
+  char *cmd;
+
+  if (argc < 2) {
+    cmd = "/bin/sh";
+  }
+  else {
+    cmd = argv[1];
+  }
+
   int master_fd = create_master();
   if (master_fd < 0) {
-    return;
+    return -1;
   }
 
   char *pts = ptsname(master_fd);
+
+  printf("master = %d\n", master_fd);
+  printf("cpath = %s\n", pts);
 
   int slave_fd = open(pts, O_RDWR);
   pid_t pid = fork();
@@ -36,9 +52,10 @@ void alt(char *cmd) {
   }
   else {
     perror("fork");
+    return -1;
   }
 
-  return;
+  return 0;
 }
 
 int create_master() {
@@ -47,8 +64,6 @@ int create_master() {
     perror("posix_openpt");
     return -1;
   }
-
-  printf("master = %d\n", master_fd);
 
   if (grantpt(master_fd) < 0) {
     perror("grantpt");
@@ -60,18 +75,20 @@ int create_master() {
     return -1;
   }
 
-  printf("cpath = %s\n", ptsname(master_fd));
   return master_fd;
 }
 
 void father(int master_fd) {
   int stdin_fd = fileno(stdin);
-
   fd_set inps;
+
+  // don't keep zombies hanging around. they're bad and prone to knocking
+  //furniture about.
+  signal(SIGCHLD, SIG_IGN);
 
   while (1) {
     FD_ZERO(&inps);
-    FD_SET(fileno(stdin), &inps);
+    FD_SET(stdin_fd, &inps);
     FD_SET(master_fd, &inps);
 
     if (select(master_fd+1, &inps, NULL, NULL, NULL) < 0) {
@@ -92,8 +109,8 @@ void father(int master_fd) {
     if (FD_ISSET(master_fd, &inps)) {
       // slave -> stdin
 
-      // TODO kill child?
       if (spillout(master_fd, stdin_fd) < 0) {
+        // TODO kill child?
         perror("slave -> stdin");
         return;
       }
@@ -122,12 +139,6 @@ int spillout(int src_fd, int dst_fd) {
 }
 
 void child(int slave_fd, char *pts, char *cmd) {
-  struct termios slave_settings;
-
-  tcgetattr(slave_fd, &slave_settings);
-  cfmakeraw(&slave_settings);
-  tcsetattr(slave_fd, TCSANOW, &slave_settings);
-
   dup2(slave_fd, 0);
   dup2(slave_fd, 1);
   dup2(slave_fd, 2);
@@ -142,8 +153,6 @@ void child(int slave_fd, char *pts, char *cmd) {
     exit(EXIT_FAILURE);
   }
 
-  // TODO sigchild handler
-
   char *args[] = { cmd, "-h", NULL };
 
   // this is where the magic happens
@@ -156,19 +165,4 @@ void child(int slave_fd, char *pts, char *cmd) {
   // we only get here on errors
   perror("failed to create child");
   exit(EXIT_FAILURE);
-}
-
-int main(int argc, char *argv[]) {
-  char *cmd;
-
-  if (argc < 2) {
-    cmd = "/bin/sh";
-  }
-  else {
-    cmd = argv[1];
-  }
-
-  alt(cmd);
-
-  return 0;
 }
