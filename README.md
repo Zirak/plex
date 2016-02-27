@@ -12,8 +12,30 @@ $ ./plex /bin/bash
 echo 4 | ./per &> /dev/null
 ```
 
-# Roadmap
+# External patches
+Here's a bunch of patches to make `userin` and `userout` work in actual TEs.
 
+## tmux
+Done against [e9d369a09e48ea8f940958025c8444988d31e840](https://github.com/tmux/tmux/tree/e9d369a09e48ea8f940958025c8444988d31e840).
+
+```patch
+diff --git a/window.c b/window.c
+index a364948..04f50f5 100644
+--- a/window.c
++++ b/window.c
+@@ -875,6 +875,10 @@ window_pane_spawn(struct window_pane *wp, int argc, char **argv,
+
+ 		if (path != NULL)
+ 			environ_set(env, "PATH", "%s", path);
++		// zirak: better-streams
++		environ_set(env, "USERIN_PATH", "%s", wp->tty);
++		environ_set(env, "USEROUT_PATH", "%s", wp->tty);
++		// /zirak
+ 		environ_set(env, "TMUX_PANE", "%%%u", wp->id);
+ 		environ_push(env);
+```
+
+# Roadmap
 In this section I'll pour the solutions I've explored and other random thoughts.
 
 ## Defining userin and userout
