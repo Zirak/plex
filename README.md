@@ -4,7 +4,7 @@ A POC of (some of) the ideas presented in [my rant](https://medium.com/@zirakert
 * `per.c` is a stupid program which uses said `userin` and `userout`.
 * `getuserin` and `getuserout` are defined in `better-streams.h`. Just include and you can enjoy the wonders.
 
-# Previewing
+## Previewing
 
 ```sh
 $ make
@@ -12,10 +12,10 @@ $ ./plex /bin/bash
 echo 4 | ./per &> /dev/null
 ```
 
-# External patches
+## External patches
 Here's a bunch of patches to make `userin` and `userout` work in actual TEs.
 
-## ssh
+### ssh
 Done against [72b061d4ba0f909501c595d709ea76e06b01e5c9](https://github.com/openssh/openssh-portable/tree/72b061d4ba0f909501c595d709ea76e06b01e5c9).
 
 ```patch
@@ -38,7 +38,7 @@ index 7a02500..639f1e4 100644
         if (s->display)
 ```
 
-## tmux
+### tmux
 Done against [e9d369a09e48ea8f940958025c8444988d31e840](https://github.com/tmux/tmux/tree/e9d369a09e48ea8f940958025c8444988d31e840).
 
 ```patch
@@ -58,36 +58,36 @@ index a364948..04f50f5 100644
  		environ_push(env);
 ```
 
-# Roadmap
+## Roadmap
 In this section I'll pour the solutions I've explored and other random thoughts.
 
-## Defining userin and userout
+### Defining userin and userout
 How can `userin` and `userout` be defined?
 
-### Create our own `/dev/tty`
+#### Create our own `/dev/tty`
 `/dev/tty` is a magical being which talks to the terminal. If we can re-create it then we win.
 
 That's not very possible (or at least probable). `/dev/tty` is its own inode type, creating it requires `mknod`, and from there it's all syscalls.
 
 While reading into it I discovered that a tty is a [kernelic object](http://lxr.free-electrons.com/source/include/uapi/asm-generic/termbits.h#L11) with its [own set of ioctls](http://man7.org/linux/man-pages/man4/tty_ioctl.4.html)!
 
-### Write a kernel module
+#### Write a kernel module
 Yeah, no. That'd be modifying a kernel struct, which means that to use `userout` your *users* will have to run a kernel module or wait for it to be included in the kernel itself (...yeah).
 
-### Then look at isatty
+#### Then look at isatty
 How does `isatty` work? Does it somehow talk to your terminal with awesome black magic?
 
 The answer is no. It's just an `ioctl` (`tcgetattr`).
 
-### Inject the fds to your children
+#### Inject the fds to your children
 Difficult, error prone, and non-recursive. They'd have to also be inejcted into your children and grand-children.
 
 Not very applicable (even if it's cool).
 
-### Find PID of terminal
+#### Find PID of terminal
 And communicate via pipes? Maybe.
 
-### Environment variables
+#### Environment variables
 Simplest and most backwards-compliant way.
 
 ```sh
@@ -99,7 +99,7 @@ Every program in the universe can read from env so it can be implemented without
 
 The downside is that this will forever and ever be the way. If userin will one day be part of the kernelic termios struct we'll still have to support this way.
 
-### What about Windows?
+#### What about Windows?
 Apparently, these are (sort of) built into Windows:
 
 - [WriteConsoleOutput](https://msdn.microsoft.com/en-us/library/windows/desktop/ms687404.aspx)
@@ -111,7 +111,7 @@ POSIX: 0. WinAPI: 1. Who knew.
 
 I haven't planned if and how support will be added.
 
-## forkstream
+### forkstream
 I'm still in the black on this one, especially because its name is so
 bad. Thinking of different things.
 
@@ -164,5 +164,5 @@ Delaying and synchronising writes? Maybe this shouldn't be a problem?
 
 Maybe forkstream should return `NULL` on non-compliant terminals?
 
-* License
+## License
 WTFPL.
