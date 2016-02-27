@@ -15,6 +15,29 @@ echo 4 | ./per &> /dev/null
 # External patches
 Here's a bunch of patches to make `userin` and `userout` work in actual TEs.
 
+## ssh
+Done against [72b061d4ba0f909501c595d709ea76e06b01e5c9](https://github.com/openssh/openssh-portable/tree/72b061d4ba0f909501c595d709ea76e06b01e5c9).
+
+```patch
+diff --git a/session.c b/session.c
+index 7a02500..639f1e4 100644
+--- a/session.c
++++ b/session.c
+@@ -1249,8 +1249,11 @@ do_setup_env(Session *s, const char *shell)
+        free(laddr);
+        child_set_env(&env, &envsize, "SSH_CONNECTION", buf);
+
+-       if (s->ttyfd != -1)
++       if (s->ttyfd != -1) {
+                child_set_env(&env, &envsize, "SSH_TTY", s->tty);
++               child_set_env(&env, &envsize, "USERIN_PATH", s->tty);
++               child_set_env(&env, &envsize, "USEROUT_PATH", s->tty);
++       }
+        if (s->term)
+                child_set_env(&env, &envsize, "TERM", s->term);
+        if (s->display)
+```
+
 ## tmux
 Done against [e9d369a09e48ea8f940958025c8444988d31e840](https://github.com/tmux/tmux/tree/e9d369a09e48ea8f940958025c8444988d31e840).
 
